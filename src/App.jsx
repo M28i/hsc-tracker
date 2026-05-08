@@ -4,17 +4,17 @@ const DEFAULT_DATA = [
   {
     name: "Physics",
     tasks: [
-      { raw: "18.5/30", pct: 61.67, weight: 15, label: "T1" },
-      { raw: "32.5/40", pct: 81.25, weight: 25, label: "T2" },
-      { raw: null, pct: null, weight: 30, label: "T3 – Trials" },
-      { raw: null, pct: null, weight: 30, label: "T4 – Depth Study" },
+      { raw: null, pct: null, weight: 15, label: "T1" },
+      { raw: null, pct: null, weight: 25, label: "T2" },
+      { raw: null, pct: null, weight: 30, label: "T3" },
+      { raw: null, pct: null, weight: 30, label: "T4" },
     ],
   },
   {
     name: "Maths Adv",
     tasks: [
-      { raw: "26/34", pct: 76.47, weight: 20, label: "T1" },
-      { raw: "30/34", pct: 88.24, weight: 25, label: "T2" },
+      { raw: null, pct: null, weight: 20, label: "T1" },
+      { raw: null, pct: null, weight: 25, label: "T2" },
       { raw: null, pct: null, weight: 25, label: "T3" },
       { raw: null, pct: null, weight: 30, label: "T4" },
     ],
@@ -22,7 +22,7 @@ const DEFAULT_DATA = [
   {
     name: "Maths Ext 1",
     tasks: [
-      { raw: "83%", pct: 83, weight: 20, label: "T1" },
+      { raw: null, pct: null, weight: 20, label: "T1" },
       { raw: null, pct: null, weight: 25, label: "T2" },
       { raw: null, pct: null, weight: 25, label: "T3" },
       { raw: null, pct: null, weight: 30, label: "T4" },
@@ -31,7 +31,7 @@ const DEFAULT_DATA = [
   {
     name: "Eng Adv",
     tasks: [
-      { raw: "17/25", pct: 68, weight: 20, label: "T1" },
+      { raw: null, pct: null, weight: 20, label: "T1" },
       { raw: null, pct: null, weight: 25, label: "T2" },
       { raw: null, pct: null, weight: 25, label: "T3" },
       { raw: null, pct: null, weight: 30, label: "T4" },
@@ -40,8 +40,8 @@ const DEFAULT_DATA = [
   {
     name: "SOR II",
     tasks: [
-      { raw: "47.5/60", pct: 79.17, weight: 20, label: "T1" },
-      { raw: "19/20", pct: 95, weight: 25, label: "T2" },
+      { raw: null, pct: null, weight: 20, label: "T1" },
+      { raw: null, pct: null, weight: 25, label: "T2" },
       { raw: null, pct: null, weight: 25, label: "T3" },
       { raw: null, pct: null, weight: 30, label: "T4" },
     ],
@@ -49,8 +49,8 @@ const DEFAULT_DATA = [
   {
     name: "Ancient History",
     tasks: [
-      { raw: "66.67%", pct: 66.67, weight: 25, label: "T1" },
-      { raw: "23/25", pct: 92, weight: 20, label: "T2" },
+      { raw: null, pct: null, weight: 25, label: "T1" },
+      { raw: null, pct: null, weight: 20, label: "T2" },
       { raw: null, pct: null, weight: 25, label: "T3" },
       { raw: null, pct: null, weight: 30, label: "T4" },
     ],
