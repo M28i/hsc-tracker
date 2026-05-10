@@ -98,7 +98,76 @@ function getDifficultyTag(neededAvg) {
   return { text: "UNLIKELY", color: "#ef4444", bg: "rgba(239,68,68,0.12)" };
 }
 
-function SimCell({ task, simValue, onSimChange, onClear }) {
+function EditableWeight({ weight, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [editing]);
+
+  const handleSubmit = () => {
+    const num = parseInt(inputVal.trim(), 10);
+    if (!isNaN(num) && num >= 0 && num <= 100) {
+      onChange(num);
+    }
+    setEditing(false);
+    setInputVal("");
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputVal}
+        placeholder={`${weight}`}
+        onChange={(e) => setInputVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSubmit();
+          if (e.key === "Escape") { setEditing(false); setInputVal(""); }
+        }}
+        onBlur={handleSubmit}
+        style={{
+          background: "#1e293b",
+          border: "1px solid #6366f1",
+          borderRadius: 3,
+          color: "#f8fafc",
+          fontSize: 9,
+          fontFamily: "'JetBrains Mono', monospace",
+          fontWeight: 600,
+          padding: "1px 4px",
+          outline: "none",
+          width: 32,
+          textAlign: "center",
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      style={{
+        background: "rgba(100,116,139,0.15)",
+        padding: "1px 5px",
+        borderRadius: 3,
+        cursor: "pointer",
+        transition: "background 0.15s",
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(99,102,241,0.25)"}
+      onMouseLeave={(e) => e.currentTarget.style.background = "rgba(100,116,139,0.15)"}
+      title="Click to change weight"
+    >
+      w:{weight}%
+    </span>
+  );
+}
+
+function SimCell({ task, simValue, onSimChange, onClear, currentWeight, onWeightChange }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef(null);
@@ -135,9 +204,7 @@ function SimCell({ task, simValue, onSimChange, onClear }) {
           display: "flex", justifyContent: "space-between",
         }}>
           <span>{task.label}</span>
-          <span style={{ background: "rgba(100,116,139,0.15)", padding: "1px 5px", borderRadius: 3 }}>
-            w:{task.weight}%
-          </span>
+          <EditableWeight weight={currentWeight} onChange={onWeightChange} />
         </div>
         <input
           ref={inputRef}
@@ -194,9 +261,7 @@ function SimCell({ task, simValue, onSimChange, onClear }) {
             }}>
               SIM
             </span>
-            <span style={{ background: "rgba(100,116,139,0.15)", padding: "1px 5px", borderRadius: 3 }}>
-              w:{task.weight}%
-            </span>
+            <EditableWeight weight={currentWeight} onChange={onWeightChange} />
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
@@ -242,9 +307,7 @@ function SimCell({ task, simValue, onSimChange, onClear }) {
         display: "flex", justifyContent: "space-between",
       }}>
         <span>{task.label}</span>
-        <span style={{ background: "rgba(100,116,139,0.15)", padding: "1px 5px", borderRadius: 3 }}>
-          w:{task.weight}%
-        </span>
+        <EditableWeight weight={currentWeight} onChange={onWeightChange} />
       </div>
       <div style={{
         fontSize: 12, color: "#475569", fontWeight: 600,
@@ -261,6 +324,9 @@ export default function HSCTracker() {
   const [target, setTarget] = useState(85);
   const [loaded, setLoaded] = useState(false);
   const [simScores, setSimScores] = useState({});
+  const [customWeights, setCustomWeights] = useState(
+    DEFAULT_DATA.map((s) => s.tasks.map((t) => t.weight))
+  );
 
   useEffect(() => {
     try {
@@ -271,6 +337,10 @@ export default function HSCTracker() {
       const savedTarget = localStorage.getItem("hsc-tracker-target");
       if (savedTarget) setTarget(JSON.parse(savedTarget));
     } catch (e) {}
+    try {
+      const savedWeights = localStorage.getItem("hsc-tracker-weights");
+      if (savedWeights) setCustomWeights(JSON.parse(savedWeights));
+    } catch (e) {}
     setLoaded(true);
   }, []);
 
@@ -278,7 +348,16 @@ export default function HSCTracker() {
     if (!loaded) return;
     try { localStorage.setItem("hsc-tracker-sims", JSON.stringify(simScores)); } catch (e) {}
     try { localStorage.setItem("hsc-tracker-target", JSON.stringify(target)); } catch (e) {}
-  }, [simScores, target, loaded]);
+    try { localStorage.setItem("hsc-tracker-weights", JSON.stringify(customWeights)); } catch (e) {}
+  }, [simScores, target, customWeights, loaded]);
+
+  const setWeight = (si, ti, val) => {
+    setCustomWeights((prev) => {
+      const next = prev.map((row) => [...row]);
+      next[si][ti] = val;
+      return next;
+    });
+  };
 
   const data = DEFAULT_DATA;
 
@@ -307,7 +386,13 @@ export default function HSCTracker() {
 
   const clearAllSims = () => setSimScores({});
 
-  const allCalcs = data.map((s, si) => calcSubject(s, simScores[si], target));
+  const allCalcs = data.map((s, si) => {
+    const subjectWithWeights = {
+      ...s,
+      tasks: s.tasks.map((t, ti) => ({ ...t, weight: customWeights[si][ti] })),
+    };
+    return calcSubject(subjectWithWeights, simScores[si], target);
+  });
 
   const overallCurrentPct =
     allCalcs.reduce((sum, c) => sum + c.currentPct, 0) / allCalcs.length;
@@ -514,9 +599,7 @@ export default function HSCTracker() {
                           display: "flex", justifyContent: "space-between",
                         }}>
                           <span>{task.label}</span>
-                          <span style={{ background: "rgba(100,116,139,0.15)", padding: "1px 5px", borderRadius: 3 }}>
-                            w:{task.weight}%
-                          </span>
+                          <EditableWeight weight={customWeights[si][ti]} onChange={(val) => setWeight(si, ti, val)} />
                         </div>
                         <div style={{
                           fontSize: 18, fontWeight: 700, color: getPctColor(task.pct),
@@ -537,6 +620,8 @@ export default function HSCTracker() {
                       simValue={simScores[si]?.[ti]}
                       onSimChange={(val) => setSimScore(si, ti, val)}
                       onClear={() => clearSim(si, ti)}
+                      currentWeight={customWeights[si][ti]}
+                      onWeightChange={(val) => setWeight(si, ti, val)}
                     />
                   );
                 })}
