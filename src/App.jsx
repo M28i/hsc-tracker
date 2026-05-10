@@ -47,7 +47,7 @@ function makeId() {
 }
 
 function makeSubject() {
-  return { id: makeId(), name: null, weights: [...DEFAULT_WEIGHTS], sims: {} };
+  return { id: makeId(), name: null, weights: [...DEFAULT_WEIGHTS], sims: {}, scores: {} };
 }
 
 function calcSubject(subject, target = 85) {
@@ -56,9 +56,13 @@ function calcSubject(subject, target = 85) {
   let remainingWeight = 0;
 
   subject.weights.forEach((w, ti) => {
+    const score = subject.scores?.[ti];
     const sim = subject.sims[ti];
-    if (sim !== undefined && sim !== null) {
-      weightedSum += (sim * w) / 100;
+    const value = score !== undefined && score !== null
+      ? score
+      : (sim !== undefined && sim !== null ? sim : null);
+    if (value !== null) {
+      weightedSum += (value * w) / 100;
       completedWeight += w;
     } else {
       remainingWeight += w;
@@ -186,11 +190,12 @@ function EditableWeight({ weight, onChange, hasError }) {
   );
 }
 
-function SimCell({ label, simValue, onSimChange, onClear, currentWeight, onWeightChange, hasError }) {
+function SimCell({ label, simValue, permanentValue, onSimChange, onPermanentChange, onClear, onKeep, currentWeight, onWeightChange, hasError }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef(null);
-  const hasSim = simValue !== undefined && simValue !== null;
+  const hasPermanent = permanentValue !== undefined && permanentValue !== null;
+  const hasSim = !hasPermanent && simValue !== undefined && simValue !== null;
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -202,7 +207,8 @@ function SimCell({ label, simValue, onSimChange, onClear, currentWeight, onWeigh
     const trimmed = inputVal.trim().replace("%", "");
     const num = parseFloat(trimmed);
     if (!isNaN(num) && num >= 0 && num <= 100) {
-      onSimChange(num);
+      if (hasPermanent) onPermanentChange(num);
+      else onSimChange(num);
     }
     setEditing(false);
     setInputVal("");
@@ -255,6 +261,51 @@ function SimCell({ label, simValue, onSimChange, onClear, currentWeight, onWeigh
     );
   }
 
+  if (hasPermanent) {
+    return (
+      <div
+        style={{
+          background: "rgba(34,197,94,0.06)",
+          padding: "10px 12px",
+          cursor: "pointer",
+          position: "relative",
+          borderLeft: "2px solid #22c55e",
+        }}
+        onClick={() => setEditing(true)}
+      >
+        <div style={{
+          fontSize: 9, fontWeight: 600, color: "#64748b",
+          fontFamily: "'JetBrains Mono', monospace",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <span>{label}</span>
+          <EditableWeight weight={currentWeight} onChange={onWeightChange} hasError={hasError} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+          <div style={{
+            fontSize: 18, fontWeight: 700,
+            color: getPctColor(permanentValue),
+            fontFamily: "'JetBrains Mono', monospace",
+            lineHeight: 1.2,
+          }}>
+            {permanentValue.toFixed(1)}%
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            style={{
+              background: "rgba(239,68,68,0.15)", border: "none", borderRadius: 4,
+              color: "#f87171", cursor: "pointer", padding: "2px 6px", fontSize: 10,
+              fontWeight: 600, lineHeight: "16px",
+            }}
+            title="Clear score"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (hasSim) {
     return (
       <div
@@ -280,6 +331,27 @@ function SimCell({ label, simValue, onSimChange, onClear, currentWeight, onWeigh
             }}>
               SIM
             </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onKeep(); }}
+              style={{
+                background: "rgba(34,197,94,0.18)",
+                border: "1px solid rgba(34,197,94,0.35)",
+                borderRadius: 3,
+                color: "#4ade80",
+                cursor: "pointer",
+                padding: "0px 5px",
+                fontSize: 8,
+                fontWeight: 700,
+                lineHeight: 1.4,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 2,
+                fontFamily: "inherit",
+              }}
+              title="Keep as permanent score"
+            >
+              ✓ keep
+            </button>
             <EditableWeight weight={currentWeight} onChange={onWeightChange} hasError={hasError} />
           </div>
         </div>
@@ -388,11 +460,25 @@ export default function HSCTracker() {
   const setSim = (id, ti, val) =>
     updateSubject(id, (s) => ({ ...s, sims: { ...s.sims, [ti]: val } }));
 
-  const clearSim = (id, ti) =>
+  const setPermanent = (id, ti, val) =>
+    updateSubject(id, (s) => ({ ...s, scores: { ...(s.scores || {}), [ti]: val } }));
+
+  const keepSim = (id, ti) =>
     updateSubject(id, (s) => {
-      const next = { ...s.sims };
-      delete next[ti];
-      return { ...s, sims: next };
+      const sim = s.sims[ti];
+      if (sim === undefined || sim === null) return s;
+      const nextSims = { ...s.sims };
+      delete nextSims[ti];
+      return { ...s, sims: nextSims, scores: { ...(s.scores || {}), [ti]: sim } };
+    });
+
+  const clearCell = (id, ti) =>
+    updateSubject(id, (s) => {
+      const nextSims = { ...s.sims };
+      delete nextSims[ti];
+      const nextScores = { ...(s.scores || {}) };
+      delete nextScores[ti];
+      return { ...s, sims: nextSims, scores: nextScores };
     });
 
   const clearAllSims = () =>
@@ -668,8 +754,11 @@ export default function HSCTracker() {
                       key={ti}
                       label={label}
                       simValue={subject.sims[ti]}
+                      permanentValue={subject.scores?.[ti]}
                       onSimChange={(val) => setSim(subject.id, ti, val)}
-                      onClear={() => clearSim(subject.id, ti)}
+                      onPermanentChange={(val) => setPermanent(subject.id, ti, val)}
+                      onClear={() => clearCell(subject.id, ti)}
+                      onKeep={() => keepSim(subject.id, ti)}
                       currentWeight={subject.weights[ti]}
                       onWeightChange={(val) => setWeight(subject.id, ti, val)}
                       hasError={invalid}
