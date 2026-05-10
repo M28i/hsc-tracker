@@ -1,75 +1,67 @@
 import { useState, useEffect, useRef } from "react";
 
-const DEFAULT_DATA = [
-  {
-    name: "Physics",
-    tasks: [
-      { raw: null, pct: null, weight: 15, label: "T1" },
-      { raw: null, pct: null, weight: 25, label: "T2" },
-      { raw: null, pct: null, weight: 30, label: "T3" },
-      { raw: null, pct: null, weight: 30, label: "T4" },
-    ],
-  },
-  {
-    name: "Maths Adv",
-    tasks: [
-      { raw: null, pct: null, weight: 20, label: "T1" },
-      { raw: null, pct: null, weight: 25, label: "T2" },
-      { raw: null, pct: null, weight: 25, label: "T3" },
-      { raw: null, pct: null, weight: 30, label: "T4" },
-    ],
-  },
-  {
-    name: "Maths Ext 1",
-    tasks: [
-      { raw: null, pct: null, weight: 20, label: "T1" },
-      { raw: null, pct: null, weight: 25, label: "T2" },
-      { raw: null, pct: null, weight: 25, label: "T3" },
-      { raw: null, pct: null, weight: 30, label: "T4" },
-    ],
-  },
-  {
-    name: "Eng Adv",
-    tasks: [
-      { raw: null, pct: null, weight: 20, label: "T1" },
-      { raw: null, pct: null, weight: 25, label: "T2" },
-      { raw: null, pct: null, weight: 25, label: "T3" },
-      { raw: null, pct: null, weight: 30, label: "T4" },
-    ],
-  },
-  {
-    name: "SOR II",
-    tasks: [
-      { raw: null, pct: null, weight: 20, label: "T1" },
-      { raw: null, pct: null, weight: 25, label: "T2" },
-      { raw: null, pct: null, weight: 25, label: "T3" },
-      { raw: null, pct: null, weight: 30, label: "T4" },
-    ],
-  },
-  {
-    name: "Ancient History",
-    tasks: [
-      { raw: null, pct: null, weight: 25, label: "T1" },
-      { raw: null, pct: null, weight: 20, label: "T2" },
-      { raw: null, pct: null, weight: 25, label: "T3" },
-      { raw: null, pct: null, weight: 30, label: "T4" },
-    ],
-  },
+const HSC_SUBJECTS = [
+  "Agriculture",
+  "Ancient History",
+  "Biology",
+  "Business Studies",
+  "Chemistry",
+  "Community and Family Studies",
+  "Design and Technology",
+  "Drama",
+  "Earth & Environmental Science",
+  "Economics",
+  "Engineering Studies",
+  "English Advanced",
+  "English Extension 1",
+  "English Extension 2",
+  "English Standard",
+  "Food Technology",
+  "Geography",
+  "History Extension",
+  "Industrial Technology",
+  "Investigating Science",
+  "Legal Studies",
+  "Mathematics Advanced",
+  "Mathematics Extension 1",
+  "Mathematics Extension 2",
+  "Mathematics Standard 2",
+  "Modern History",
+  "Music 1",
+  "Music 2",
+  "PDHPE",
+  "Physics",
+  "Society and Culture",
+  "Software Design and Development",
+  "Studies of Religion I",
+  "Studies of Religion II",
+  "Textiles and Design",
+  "Visual Arts",
 ];
 
-function calcSubject(subject, simScores, target = 85) {
+const TASK_LABELS = ["T1", "T2", "T3", "T4"];
+const DEFAULT_WEIGHTS = [25, 25, 25, 25];
+
+function makeId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function makeSubject() {
+  return { id: makeId(), name: null, weights: [...DEFAULT_WEIGHTS], sims: {} };
+}
+
+function calcSubject(subject, target = 85) {
   let weightedSum = 0;
   let completedWeight = 0;
   let remainingWeight = 0;
 
-  subject.tasks.forEach((t, ti) => {
-    const simVal = simScores?.[ti];
-    const pct = simVal !== undefined && simVal !== null ? simVal : t.pct;
-    if (pct !== null && pct !== undefined) {
-      weightedSum += (pct * t.weight) / 100;
-      completedWeight += t.weight;
+  subject.weights.forEach((w, ti) => {
+    const sim = subject.sims[ti];
+    if (sim !== undefined && sim !== null) {
+      weightedSum += (sim * w) / 100;
+      completedWeight += w;
     } else {
-      remainingWeight += t.weight;
+      remainingWeight += w;
     }
   });
 
@@ -79,6 +71,12 @@ function calcSubject(subject, simScores, target = 85) {
   const finalPct = remainingWeight === 0 ? weightedSum : null;
 
   return { currentWeighted: weightedSum, currentPct, neededAvg, completedWeight, remainingWeight, finalPct };
+}
+
+function isInvalidWeights(subject) {
+  if (!subject.name) return false;
+  const sum = subject.weights.reduce((a, b) => a + b, 0);
+  return sum !== 100;
 }
 
 function getPctColor(pct) {
@@ -98,7 +96,7 @@ function getDifficultyTag(neededAvg) {
   return { text: "UNLIKELY", color: "#ef4444", bg: "rgba(239,68,68,0.12)" };
 }
 
-function EditableWeight({ weight, onChange }) {
+function EditableWeight({ weight, onChange, hasError }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef(null);
@@ -118,33 +116,50 @@ function EditableWeight({ weight, onChange }) {
     setInputVal("");
   };
 
+  const asterisk = hasError ? (
+    <span style={{
+      position: "absolute",
+      top: -9,
+      left: "50%",
+      transform: "translateX(-50%)",
+      color: "#ef4444",
+      fontSize: 13,
+      fontWeight: 700,
+      lineHeight: 1,
+      pointerEvents: "none",
+    }}>*</span>
+  ) : null;
+
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        type="text"
-        value={inputVal}
-        placeholder={`${weight}`}
-        onChange={(e) => setInputVal(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleSubmit();
-          if (e.key === "Escape") { setEditing(false); setInputVal(""); }
-        }}
-        onBlur={handleSubmit}
-        style={{
-          background: "#1e293b",
-          border: "1px solid #6366f1",
-          borderRadius: 3,
-          color: "#f8fafc",
-          fontSize: 9,
-          fontFamily: "'JetBrains Mono', monospace",
-          fontWeight: 600,
-          padding: "1px 4px",
-          outline: "none",
-          width: 32,
-          textAlign: "center",
-        }}
-      />
+      <span style={{ position: "relative", display: "inline-block" }}>
+        {asterisk}
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputVal}
+          placeholder={`${weight}`}
+          onChange={(e) => setInputVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSubmit();
+            if (e.key === "Escape") { setEditing(false); setInputVal(""); }
+          }}
+          onBlur={handleSubmit}
+          style={{
+            background: "#1e293b",
+            border: `1px solid ${hasError ? "#ef4444" : "#6366f1"}`,
+            borderRadius: 3,
+            color: "#f8fafc",
+            fontSize: 9,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 600,
+            padding: "1px 4px",
+            outline: "none",
+            width: 32,
+            textAlign: "center",
+          }}
+        />
+      </span>
     );
   }
 
@@ -152,22 +167,26 @@ function EditableWeight({ weight, onChange }) {
     <span
       onClick={(e) => { e.stopPropagation(); setEditing(true); }}
       style={{
-        background: "rgba(100,116,139,0.15)",
+        position: "relative",
+        display: "inline-block",
+        background: hasError ? "rgba(239,68,68,0.18)" : "rgba(100,116,139,0.15)",
+        color: hasError ? "#fca5a5" : undefined,
         padding: "1px 5px",
         borderRadius: 3,
         cursor: "pointer",
         transition: "background 0.15s",
       }}
-      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(99,102,241,0.25)"}
-      onMouseLeave={(e) => e.currentTarget.style.background = "rgba(100,116,139,0.15)"}
-      title="Click to change weight"
+      onMouseEnter={(e) => e.currentTarget.style.background = hasError ? "rgba(239,68,68,0.3)" : "rgba(99,102,241,0.25)"}
+      onMouseLeave={(e) => e.currentTarget.style.background = hasError ? "rgba(239,68,68,0.18)" : "rgba(100,116,139,0.15)"}
+      title={hasError ? "Weights must add up to 100" : "Click to change weight"}
     >
+      {asterisk}
       w:{weight}%
     </span>
   );
 }
 
-function SimCell({ task, simValue, onSimChange, onClear, currentWeight, onWeightChange }) {
+function SimCell({ label, simValue, onSimChange, onClear, currentWeight, onWeightChange, hasError }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef(null);
@@ -201,10 +220,10 @@ function SimCell({ task, simValue, onSimChange, onClear, currentWeight, onWeight
         <div style={{
           fontSize: 9, fontWeight: 600, color: "#64748b",
           fontFamily: "'JetBrains Mono', monospace",
-          display: "flex", justifyContent: "space-between",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span>{task.label}</span>
-          <EditableWeight weight={currentWeight} onChange={onWeightChange} />
+          <span>{label}</span>
+          <EditableWeight weight={currentWeight} onChange={onWeightChange} hasError={hasError} />
         </div>
         <input
           ref={inputRef}
@@ -253,7 +272,7 @@ function SimCell({ task, simValue, onSimChange, onClear, currentWeight, onWeight
           fontFamily: "'JetBrains Mono', monospace",
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span>{task.label}</span>
+          <span>{label}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{
               background: "rgba(99,102,241,0.2)", color: "#818cf8",
@@ -261,7 +280,7 @@ function SimCell({ task, simValue, onSimChange, onClear, currentWeight, onWeight
             }}>
               SIM
             </span>
-            <EditableWeight weight={currentWeight} onChange={onWeightChange} />
+            <EditableWeight weight={currentWeight} onChange={onWeightChange} hasError={hasError} />
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
@@ -304,10 +323,10 @@ function SimCell({ task, simValue, onSimChange, onClear, currentWeight, onWeight
       <div style={{
         fontSize: 9, fontWeight: 600, color: "#64748b",
         fontFamily: "'JetBrains Mono', monospace",
-        display: "flex", justifyContent: "space-between",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <span>{task.label}</span>
-        <EditableWeight weight={currentWeight} onChange={onWeightChange} />
+        <span>{label}</span>
+        <EditableWeight weight={currentWeight} onChange={onWeightChange} hasError={hasError} />
       </div>
       <div style={{
         fontSize: 12, color: "#475569", fontWeight: 600,
@@ -323,83 +342,76 @@ function SimCell({ task, simValue, onSimChange, onClear, currentWeight, onWeight
 export default function HSCTracker() {
   const [target, setTarget] = useState(85);
   const [loaded, setLoaded] = useState(false);
-  const [simScores, setSimScores] = useState({});
-  const [customWeights, setCustomWeights] = useState(
-    DEFAULT_DATA.map((s) => s.tasks.map((t) => t.weight))
-  );
+  const [subjects, setSubjects] = useState(() => [makeSubject()]);
 
   useEffect(() => {
     try {
-      const savedSims = localStorage.getItem("hsc-tracker-sims");
-      if (savedSims) setSimScores(JSON.parse(savedSims));
+      const saved = localStorage.getItem("hsc-tracker-subjects");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setSubjects(parsed);
+      }
     } catch (e) {}
     try {
       const savedTarget = localStorage.getItem("hsc-tracker-target");
       if (savedTarget) setTarget(JSON.parse(savedTarget));
-    } catch (e) {}
-    try {
-      const savedWeights = localStorage.getItem("hsc-tracker-weights");
-      if (savedWeights) setCustomWeights(JSON.parse(savedWeights));
     } catch (e) {}
     setLoaded(true);
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
-    try { localStorage.setItem("hsc-tracker-sims", JSON.stringify(simScores)); } catch (e) {}
+    try { localStorage.setItem("hsc-tracker-subjects", JSON.stringify(subjects)); } catch (e) {}
     try { localStorage.setItem("hsc-tracker-target", JSON.stringify(target)); } catch (e) {}
-    try { localStorage.setItem("hsc-tracker-weights", JSON.stringify(customWeights)); } catch (e) {}
-  }, [simScores, target, customWeights, loaded]);
+  }, [subjects, target, loaded]);
 
-  const setWeight = (si, ti, val) => {
-    setCustomWeights((prev) => {
-      const next = prev.map((row) => [...row]);
-      next[si][ti] = val;
-      return next;
-    });
+  const updateSubject = (id, updater) => {
+    setSubjects((prev) => prev.map((s) => (s.id === id ? updater(s) : s)));
   };
 
-  const data = DEFAULT_DATA;
+  const addSubject = () => setSubjects((prev) => [...prev, makeSubject()]);
 
-  const hasSims = Object.values(simScores).some(
-    (sub) => sub && Object.values(sub).some((v) => v !== undefined && v !== null)
+  const removeSubject = (id) => {
+    setSubjects((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const setSubjectName = (id, name) =>
+    updateSubject(id, (s) => ({ ...s, name: name || null }));
+
+  const setWeight = (id, ti, val) =>
+    updateSubject(id, (s) => {
+      const next = [...s.weights];
+      next[ti] = val;
+      return { ...s, weights: next };
+    });
+
+  const setSim = (id, ti, val) =>
+    updateSubject(id, (s) => ({ ...s, sims: { ...s.sims, [ti]: val } }));
+
+  const clearSim = (id, ti) =>
+    updateSubject(id, (s) => {
+      const next = { ...s.sims };
+      delete next[ti];
+      return { ...s, sims: next };
+    });
+
+  const clearAllSims = () =>
+    setSubjects((prev) => prev.map((s) => ({ ...s, sims: {} })));
+
+  const hasSims = subjects.some((s) =>
+    Object.values(s.sims).some((v) => v !== undefined && v !== null)
   );
 
-  const setSimScore = (si, ti, val) => {
-    setSimScores((prev) => ({
-      ...prev,
-      [si]: { ...(prev[si] || {}), [ti]: val },
-    }));
-  };
-
-  const clearSim = (si, ti) => {
-    setSimScores((prev) => {
-      const next = { ...prev };
-      if (next[si]) {
-        const sub = { ...next[si] };
-        delete sub[ti];
-        next[si] = sub;
-      }
-      return next;
-    });
-  };
-
-  const clearAllSims = () => setSimScores({});
-
-  const allCalcs = data.map((s, si) => {
-    const subjectWithWeights = {
-      ...s,
-      tasks: s.tasks.map((t, ti) => ({ ...t, weight: customWeights[si][ti] })),
-    };
-    return calcSubject(subjectWithWeights, simScores[si], target);
-  });
+  const namedValid = subjects.filter((s) => s.name && !isInvalidWeights(s));
 
   const overallCurrentPct =
-    allCalcs.reduce((sum, c) => sum + c.currentPct, 0) / allCalcs.length;
+    namedValid.length > 0
+      ? namedValid.reduce((sum, s) => sum + calcSubject(s, target).currentPct, 0) / namedValid.length
+      : 0;
 
-  const priorityRanking = data
-    .map((s, i) => ({ name: s.name, ...allCalcs[i] }))
-    .filter((s) => s.neededAvg !== null)
+  const priorityRanking = namedValid
+    .map((s) => ({ name: s.name, ...calcSubject(s, target) }))
+    .filter((c) => c.neededAvg !== null)
     .sort((a, b) => b.neededAvg - a.neededAvg);
 
   return (
@@ -498,15 +510,24 @@ export default function HSCTracker() {
       </div>
 
       <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        {data.map((subject, si) => {
-          const calc = allCalcs[si];
-          const diff = getDifficultyTag(calc.neededAvg);
-          const subjectHasSims = simScores[si] && Object.values(simScores[si]).some((v) => v !== undefined && v !== null);
+        {subjects.map((subject) => {
+          const calc = calcSubject(subject, target);
+          const invalid = isInvalidWeights(subject);
+          const hasName = !!subject.name;
+          const diff = hasName && !invalid ? getDifficultyTag(calc.neededAvg) : null;
+          const subjectHasSims = Object.values(subject.sims).some((v) => v !== undefined && v !== null);
+          const availableNames = HSC_SUBJECTS.filter(
+            (n) => n === subject.name || !subjects.some((other) => other.name === n)
+          );
 
           return (
-            <div key={si} style={{
+            <div key={subject.id} style={{
               background: "#111827",
-              border: subjectHasSims ? "1px solid rgba(99,102,241,0.25)" : "1px solid #1e293b",
+              border: invalid
+                ? "1px solid rgba(239,68,68,0.4)"
+                : subjectHasSims
+                  ? "1px solid rgba(99,102,241,0.25)"
+                  : "1px solid #1e293b",
               borderRadius: 12, marginBottom: 12, overflow: "hidden",
               transition: "border-color 0.2s",
             }}>
@@ -514,16 +535,45 @@ export default function HSCTracker() {
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "14px 18px 10px", flexWrap: "wrap", gap: 8,
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <h2 style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9", margin: 0 }}>
-                    {subject.name}
-                  </h2>
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, color: diff.color, background: diff.bg,
-                    padding: "2px 8px", borderRadius: 4, letterSpacing: "0.5px",
-                  }}>
-                    {diff.text}
-                  </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <select
+                    value={subject.name || ""}
+                    onChange={(e) => setSubjectName(subject.id, e.target.value)}
+                    style={{
+                      background: hasName ? "rgba(99,102,241,0.08)" : "rgba(99,102,241,0.12)",
+                      border: hasName ? "1px solid rgba(99,102,241,0.18)" : "1px solid rgba(99,102,241,0.35)",
+                      color: hasName ? "#f1f5f9" : "#818cf8",
+                      fontSize: 15,
+                      fontWeight: 700,
+                      fontFamily: "inherit",
+                      padding: "5px 10px",
+                      cursor: "pointer",
+                      outline: "none",
+                      borderRadius: 6,
+                      minWidth: 180,
+                    }}
+                  >
+                    <option value="">— select subject —</option>
+                    {availableNames.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                  {hasName && diff && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, color: diff.color, background: diff.bg,
+                      padding: "2px 8px", borderRadius: 4, letterSpacing: "0.5px",
+                    }}>
+                      {diff.text}
+                    </span>
+                  )}
+                  {hasName && invalid && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, color: "#ef4444", background: "rgba(239,68,68,0.12)",
+                      padding: "2px 8px", borderRadius: 4, letterSpacing: "0.5px",
+                    }}>
+                      WEIGHTS ≠ 100
+                    </span>
+                  )}
                   {subjectHasSims && (
                     <span style={{
                       fontSize: 9, fontWeight: 600, color: "#818cf8",
@@ -535,100 +585,131 @@ export default function HSCTracker() {
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 10, color: "#64748b", fontWeight: 500 }}>CURRENT</div>
-                    <div style={{
-                      fontSize: 18, fontWeight: 700, color: getPctColor(calc.currentPct),
-                      fontFamily: "'JetBrains Mono', monospace",
-                    }}>
-                      {calc.currentPct.toFixed(1)}%
-                    </div>
-                  </div>
-                  {calc.neededAvg !== null ? (
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 500 }}>NEED AVG</div>
-                      <div style={{
-                        fontSize: 18, fontWeight: 700,
-                        color: calc.neededAvg > 100 ? "#ef4444" : calc.neededAvg > 92 ? "#f97316" : "#eab308",
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}>
-                        {calc.neededAvg.toFixed(1)}%
-                      </div>
-                    </div>
-                  ) : calc.finalPct !== null ? (
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 500 }}>FINAL</div>
-                      <div style={{
-                        fontSize: 18, fontWeight: 700,
-                        color: calc.finalPct >= target ? "#22c55e" : "#ef4444",
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}>
-                        {calc.finalPct.toFixed(1)}%
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <div style={{ padding: "0 18px 6px" }}>
-                <div style={{
-                  height: 4, background: "#1e293b", borderRadius: 2, overflow: "hidden", display: "flex",
-                }}>
-                  <div style={{
-                    width: `${calc.completedWeight}%`,
-                    background: `linear-gradient(90deg, ${getPctColor(calc.currentPct)}88, ${getPctColor(calc.currentPct)})`,
-                    borderRadius: 2, transition: "width 0.3s ease",
-                  }} />
-                </div>
-                <div style={{ fontSize: 10, color: "#475569", marginTop: 3 }}>
-                  {calc.completedWeight}% of total weight {calc.remainingWeight === 0 ? "— all filled" : "completed"}
-                </div>
-              </div>
-
-              <div style={{
-                display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 1, background: "#1e293b", borderTop: "1px solid #1e293b",
-              }}>
-                {subject.tasks.map((task, ti) => {
-                  if (task.pct !== null) {
-                    return (
-                      <div key={ti} style={{ background: "#111827", padding: "10px 12px" }}>
+                  {hasName && !invalid && (
+                    <>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 500 }}>CURRENT</div>
                         <div style={{
-                          fontSize: 9, fontWeight: 600, color: "#64748b",
+                          fontSize: 18, fontWeight: 700, color: getPctColor(calc.currentPct),
                           fontFamily: "'JetBrains Mono', monospace",
-                          display: "flex", justifyContent: "space-between",
                         }}>
-                          <span>{task.label}</span>
-                          <EditableWeight weight={customWeights[si][ti]} onChange={(val) => setWeight(si, ti, val)} />
+                          {calc.currentPct.toFixed(1)}%
                         </div>
-                        <div style={{
-                          fontSize: 18, fontWeight: 700, color: getPctColor(task.pct),
-                          fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.2, marginTop: 4,
-                        }}>
-                          {task.pct.toFixed(1)}%
-                        </div>
-                        {task.raw && (
-                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{task.raw}</div>
-                        )}
                       </div>
-                    );
-                  }
-                  return (
+                      {calc.neededAvg !== null ? (
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 10, color: "#64748b", fontWeight: 500 }}>NEED AVG</div>
+                          <div style={{
+                            fontSize: 18, fontWeight: 700,
+                            color: calc.neededAvg > 100 ? "#ef4444" : calc.neededAvg > 92 ? "#f97316" : "#eab308",
+                            fontFamily: "'JetBrains Mono', monospace",
+                          }}>
+                            {calc.neededAvg.toFixed(1)}%
+                          </div>
+                        </div>
+                      ) : calc.finalPct !== null ? (
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 10, color: "#64748b", fontWeight: 500 }}>FINAL</div>
+                          <div style={{
+                            fontSize: 18, fontWeight: 700,
+                            color: calc.finalPct >= target ? "#22c55e" : "#ef4444",
+                            fontFamily: "'JetBrains Mono', monospace",
+                          }}>
+                            {calc.finalPct.toFixed(1)}%
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                  <button
+                    onClick={() => removeSubject(subject.id)}
+                    style={{
+                      background: "rgba(239,68,68,0.1)",
+                      border: "1px solid rgba(239,68,68,0.2)",
+                      borderRadius: 6,
+                      color: "#f87171",
+                      cursor: "pointer",
+                      padding: "4px 9px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                    }}
+                    title="Remove subject"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {hasName && !invalid && (
+                <div style={{ padding: "0 18px 6px" }}>
+                  <div style={{
+                    height: 4, background: "#1e293b", borderRadius: 2, overflow: "hidden", display: "flex",
+                  }}>
+                    <div style={{
+                      width: `${calc.completedWeight}%`,
+                      background: `linear-gradient(90deg, ${getPctColor(calc.currentPct)}88, ${getPctColor(calc.currentPct)})`,
+                      borderRadius: 2, transition: "width 0.3s ease",
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: "#475569", marginTop: 3 }}>
+                    {calc.completedWeight}% of total weight {calc.remainingWeight === 0 ? "— all filled" : "completed"}
+                  </div>
+                </div>
+              )}
+
+              {hasName && (
+                <div style={{
+                  display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 1, background: "#1e293b", borderTop: "1px solid #1e293b",
+                }}>
+                  {TASK_LABELS.map((label, ti) => (
                     <SimCell
                       key={ti}
-                      task={task}
-                      simValue={simScores[si]?.[ti]}
-                      onSimChange={(val) => setSimScore(si, ti, val)}
-                      onClear={() => clearSim(si, ti)}
-                      currentWeight={customWeights[si][ti]}
-                      onWeightChange={(val) => setWeight(si, ti, val)}
+                      label={label}
+                      simValue={subject.sims[ti]}
+                      onSimChange={(val) => setSim(subject.id, ti, val)}
+                      onClear={() => clearSim(subject.id, ti)}
+                      currentWeight={subject.weights[ti]}
+                      onWeightChange={(val) => setWeight(subject.id, ti, val)}
+                      hasError={invalid}
                     />
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
+
+        <div
+          onClick={addSubject}
+          style={{
+            background: "#0f172a",
+            border: "1px dashed #334155",
+            borderRadius: 12,
+            padding: "18px 18px",
+            marginBottom: 12,
+            cursor: "pointer",
+            textAlign: "center",
+            color: "#64748b",
+            transition: "border-color 0.2s, color 0.2s, background 0.2s",
+            fontWeight: 600,
+            fontSize: 13,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "#6366f1";
+            e.currentTarget.style.color = "#818cf8";
+            e.currentTarget.style.background = "rgba(99,102,241,0.05)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "#334155";
+            e.currentTarget.style.color = "#64748b";
+            e.currentTarget.style.background = "#0f172a";
+          }}
+        >
+          <span style={{ fontSize: 18, marginRight: 6, verticalAlign: "middle" }}>+</span>
+          <span style={{ verticalAlign: "middle" }}>Add subject</span>
+        </div>
       </div>
 
       <div style={{
@@ -643,7 +724,9 @@ export default function HSCTracker() {
         </h3>
         {priorityRanking.length === 0 && (
           <div style={{ fontSize: 14, color: "#64748b", padding: "8px 0" }}>
-            All subjects fully simulated — check your projected finals above!
+            {namedValid.length === 0
+              ? "Pick a subject and fill in weights to see priorities."
+              : "All subjects fully simulated — check your projected finals above!"}
           </div>
         )}
         {priorityRanking.map((s, i) => {
